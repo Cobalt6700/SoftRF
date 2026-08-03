@@ -610,6 +610,7 @@ void uav()
   */
   
 }
+#endif /* MAVLINK_GCS */
 #endif /* EXCLUDE_MAVLINK */
 
 #if !defined(EXCLUDE_WIFI)
