@@ -686,10 +686,37 @@ jobs:
             arduino --verify --verbose-build --board $BOARD $PWD/software/firmware/source/SoftRF/SoftRF.ino ;
           fi ;
 
-      - name: Upload firmware
-        uses: actions/upload-artifact@v4
-        with:
-          name: firmware-${{ matrix.board }}
-          path: build/
-          if-no-files-found: warn
-          retention-days: 7
+      - name: Create artifact name
+        shell: bash
+        run: |
+          SAFE_BOARD=$(echo "${BOARD}" | tr ':/' '__')
+          echo "SAFE_BOARD=$SAFE_BOARD" >> "$GITHUB_ENV"
+
+      # - name: Upload firmware
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: firmware-${{ matrix.board }}
+      #     path: build/
+      #     if-no-files-found: warn
+      #     retention-days: 7
+
+      - name: Locate firmware
+        if: always()
+        run: |
+          echo "Searching for firmware files..."
+
+          find /tmp \
+            \( -name "*.bin" -o \
+              -name "*.hex" -o \
+              -name "*.uf2" -o \
+              -name "*.elf" \) \
+            -type f \
+            -print
+
+      # - name: Upload firmware
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: firmware-${{ env.SAFE_BOARD }}
+      #     path: firmware/
+      #     if-no-files-found: warn
+      #     retention-days: 7
