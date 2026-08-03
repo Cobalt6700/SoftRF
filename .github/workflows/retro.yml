@@ -612,7 +612,13 @@ jobs:
             fi ;
           fi ;
           if [[ "$BOARD" =~ "STM32:stm32:"         ]]; then
-            arduino --verify --verbose-build --board $BOARD $PWD/software/firmware/source/SoftRF/SoftRF.ino ;
+            # arduino --verify --verbose-build --board $BOARD $PWD/software/firmware/source/SoftRF/SoftRF.ino ;
+            arduino \
+            --verify \
+            --verbose-build \
+            --pref build.path=$GITHUB_WORKSPACE/build \
+            --board $BOARD \
+            $PWD/software/firmware/source/SoftRF/SoftRF.ino ;
           fi ;
           if [[ "$BOARD" =~ "STMicroelectronics:stm32:" ]]; then
             arduino --verify --verbose-build --board $BOARD $PWD/software/firmware/source/SoftRF/SoftRF.ino ;
@@ -679,3 +685,11 @@ jobs:
           if [[ "$BOARD" =~ "nrf54l15clean:nrf54l15clean:" ]]; then
             arduino --verify --verbose-build --board $BOARD $PWD/software/firmware/source/SoftRF/SoftRF.ino ;
           fi ;
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.board }}
+          path: build/
+          if-no-files-found: warn
+          retention-days: 7
