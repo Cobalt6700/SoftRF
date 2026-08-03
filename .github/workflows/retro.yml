@@ -705,7 +705,7 @@ jobs:
         run: |
           echo "Searching for firmware files..."
 
-          find /tmp \
+          find /build \
             \( -name "*.bin" -o \
               -name "*.hex" -o \
               -name "*.uf2" -o \
