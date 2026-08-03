@@ -91,6 +91,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define MAVLINK_GCS
+
 #include "src/system/OTA.h"
 #include "src/system/Time.h"
 #include "src/driver/LED.h"
@@ -153,7 +155,7 @@ void setup()
 {
   rst_info *resetInfo;
 
-  hw_info.soc = SoC_setup(); // Has to be very first procedure in the execution order
+  hw_info.soc = SoC_setup(); // Has to be very first procedure in the execution order # STM32 platform setup
 
   resetInfo = (rst_info *) SoC->getResetInfoPtr();
 
@@ -175,59 +177,59 @@ void setup()
 
   SERIAL_FLUSH();
 
-  EEPROM_setup();
+  EEPROM_setup(); // # Maybe need to change this if adding another mode? 
 
   SoC->Button_setup();
 
   ThisAircraft.addr = SoC->getChipId() & 0x00FFFFFF;
 
-  hw_info.rf = RF_setup();
+  hw_info.rf = RF_setup(); // # RF setup should be unaffected
 
   delay(100);
 
-  hw_info.baro = Baro_setup();
+  hw_info.baro = Baro_setup(); // # Baro setup should be unaffected - no Baro detected
 #if defined(ENABLE_AHRS)
   hw_info.imu = AHRS_setup();
 #endif /* ENABLE_AHRS */
-  hw_info.display = SoC->Display_setup();
+  hw_info.display = SoC->Display_setup(); // # Display not connected
 
 #if !defined(EXCLUDE_MAVLINK)
-  if (settings->mode == SOFTRF_MODE_UAV) {
+  if (settings->mode == SOFTRF_MODE_UAV) { // # Use MODE UAV to test MAVlink ADS-B stream
     if (hw_info.model == SOFTRF_MODEL_STANDALONE) {
       Serial.begin(57600);
     }
-    MAVLink_setup();
+    MAVLink_setup(); // # This just starts the SoC Software Serial port for MAVLink data stream
     ThisAircraft.aircraft_type = AIRCRAFT_TYPE_UAV;  
   }  else
 #endif /* EXCLUDE_MAVLINK */
   {
-    hw_info.gnss = GNSS_setup();
+    hw_info.gnss = GNSS_setup(); // # This should probe for the GNSS module and find that none is connected, so it should return GNSS_MODULE_NONE
     ThisAircraft.aircraft_type = settings->aircraft_type;
   }
   ThisAircraft.protocol = settings->rf_protocol;
   ThisAircraft.stealth  = settings->stealth;
   ThisAircraft.no_track = settings->no_track;
 
-  Battery_setup();
-  Traffic_setup();
+  Battery_setup(); // # Should be unaffected
+  Traffic_setup(); // # Should be unaffected
 
-  SoC->swSer_enableRx(false);
+  SoC->swSer_enableRx(false); // # Should be unaffected
 
-  LED_setup();
+  LED_setup(); // # Should be unaffected
 
-  WiFi_setup();
+  WiFi_setup(); // # Should be unaffected
 
   if (SoC->USB_ops) {
-     SoC->USB_ops->setup();
+     SoC->USB_ops->setup(); // # Should be unaffected
   }
 
   if (SoC->Bluetooth_ops) {
-     SoC->Bluetooth_ops->setup();
+     SoC->Bluetooth_ops->setup(); // # Should be unaffected
   }
 
-  OTA_setup();
-  Web_setup();
-  NMEA_setup();
+  OTA_setup(); // # Should be unaffected
+  Web_setup(); // # Should be unaffected
+  NMEA_setup(); // # Should be unaffected
 
 #if defined(ENABLE_TTN)
   TTN_setup();
@@ -254,15 +256,15 @@ void setup()
   case SOFTRF_MODE_NORMAL:
   case SOFTRF_MODE_UAV:
   default:
-    SoC->swSer_enableRx(true);
+    SoC->swSer_enableRx(true); // # Not sure what this is doing as the protoype function in STM32.cpp is empty, maybe this is just a flag?
     break;
   }
 
-  Recorder_setup();
+  Recorder_setup(); // # Only records if GPS is installed
 
-  SoC->post_init();
+  SoC->post_init(); // # Looks like the init on line 789 of STM32.cpp shows either normal or UAV mode, so UAV mode may have other things happening that i need to be aware of. 
 
-  SoC->WDT_setup();
+  SoC->WDT_setup(); // Init the watchdog timer with 5 seconds timeout
 }
 
 void loop()
@@ -278,7 +280,7 @@ void loop()
     break;
 #endif /* EXCLUDE_TEST_MODE */
 #if !defined(EXCLUDE_MAVLINK)
-  case SOFTRF_MODE_UAV:
+  case SOFTRF_MODE_UAV: // We are going to be using this mode to test the MAVLink ADS-B stream
     uav();
     break;
 #endif /* EXCLUDE_MAVLINK */
@@ -458,16 +460,91 @@ void normal()
 }
 
 #if !defined(EXCLUDE_MAVLINK)
+#if defined(MAVLINK_GCS)
 void uav()
 {
   bool success = false;
 
-  PickMAVLinkFix();
+  /*
+    Overall notes:
+    It looks like we need gps to give a time sync to the UAV for the MAVlink ADS-B stream to work.
+    We can try without, however the clearexpired function will not work. 
+    I have setup a second uav function which we can try and use and see if it works. 
+  
+  */
+
+  Baro_loop();
+  GNSS_loop();  
+
+  ThisAircraft.timestamp = now();
+
+  success = RF_Receive();
+
+  if (success && isValidFix()) ParseData();
+
+  if (isValidFix()) {
+    Traffic_loop();
+  }
+
+  if (isTimeToExport()) {
+    MAVLinkShareTraffic();
+    ExportTimeMarker = millis();
+  }
+
+  NMEA_loop();
+
+  ClearExpired();
+  /*
+  We need thisaircraft.timestamp to be updated to make this work. However,
+  we are not getting a valid fix, so thisaircraft.timestamp is not being updated. 
+  We need to find another way to update thisaircraft.timestamp without a valid fix. 
+  */  
+}
+#else
+void uav()
+{
+  bool success = false;
+
+  /*
+    Overall notes:
+    It looks like we need gps to give a time sync to the UAV for the MAVlink ADS-B stream to work.
+    We can try without, however the clearexpired function will not work. 
+    I have setup a second uav function which we can try and use and see if it works. 
+  
+  */
+
+  PickMAVLinkFix(); 
+  /*
+  From MAVLink.cpp:  
+    read_mavlink(); -> mavlink.cpp
+    This reads the MAVlink data from Serial3 for STM32. If it reads a MAVlink message, it will show as 
+    mavlink_active. 
+    It is looking for a MAVlink heartbeat message. It will updated using do_mavlink_heartbeat.
+    It also looks for system time and sys status messages, and will update the gps time stamp and stats like
+    batt voltage and nave mode. 
+    We dont need any of the above, so we need to do this another way.   
+    *** Need to confirm if any of the above is needed for the MAVlink ADS-B stream to work. ***
+
+  send_mavlink_heartbeat();
+    This sends a MAVlink heartbeat message to the UAV. It is not needed for our purposes, so we will not call it.
+  */
 
   MAVLinkTimeSync();
+  /*
+    This relies on gps.fix_type being set to something other than 0 for the MAVlink time sync to work.
+    If no GPS is connected, then gps.fix_type will be 0, and the MAVlink time sync will not work.
+    We need to find another way to get the MAVlink time sync to work without a GPS
+  */
   MAVLinkSetWiFiPower();
+  /*
+    This relies on the heartbe at message being received from the UAV. If no heartbeat message is received, then the WiFi power will not be set.
+    We need to find another way to set the WiFi power without a heartbeat message.
+  */
 
   hw_info.gnss = get_num_heartbeats() > 0 ? GNSS_MODULE_MAV : GNSS_MODULE_NONE;
+  /*
+    Not 100% on what this is doing or if it is required. 
+  */
 
   ThisAircraft.timestamp = now();
 
@@ -493,16 +570,45 @@ void uav()
     RF_Transmit(RF_Encode(&ThisAircraft), true);
   }
 
+  /*
+  The above is for transmitting data, which we are not. 
+  From radiolib.cpp, line 6061:
+    static bool lr20xx_transmit()  
+    ... 
+    return false;  no transmit on 1090 or 978 MHz   
+  This means no transmit will occur on 1090 or 978 MHz, which is what we want.
+  */  
+
+
   success = RF_Receive();
+  /*
+  Okay - so this is what we want! This is the functiuon that reads ADS-B data. 
+  It doesnt look like it needs anything else to do this, so we should be able to just call this function and get the ADS-B data.
+
+  */
 
   if (success && isValidMAVFix()) ParseData();
+
+  /*
+  Should be able to change this to check for success and then call ParseData() to get the ADS-B data. 
+  */
 
   if (isTimeToExport() && isValidMAVFix()) {
     MAVLinkShareTraffic();
     ExportTimeMarker = millis();
   }
 
+   /*
+  Should be able to change this to check for success and then call ParseData() to get the ADS-B data. 
+  */
+
   ClearExpired();
+  /*
+  We need thisaircraft.timestamp to be updated to make this work. However,
+  we are not getting a valid fix, so thisaircraft.timestamp is not being updated. 
+  We need to find another way to update thisaircraft.timestamp without a valid fix. 
+  */
+  
 }
 #endif /* EXCLUDE_MAVLINK */
 
