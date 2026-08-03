@@ -705,7 +705,7 @@ jobs:
         run: |
           echo "Searching for firmware files..."
 
-          find /build \
+          find $GITHUB_WORKSPACE/build \
             \( -name "*.bin" -o \
               -name "*.hex" -o \
               -name "*.uf2" -o \
