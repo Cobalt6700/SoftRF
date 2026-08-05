@@ -45,6 +45,10 @@ extern HardwareSerial Serial1;
 extern Uart Serial1;
 #elif defined(ARDUINO_ARCH_NRF54L15CLEAN)
 extern HardwareSerial Serial1;
+#elif defined(ARDUINO_ARCH_STM32)      && \
+      defined(ARDUINO_BLUEPILL_F103CB) && \
+     !defined(USBCON)
+extern HardwareSerial Serial1;
 #endif
 
 mavlink_system_t mavlink_system = {12, MAV_COMP_ID_ADSB};
@@ -64,7 +68,7 @@ void comm_send_ch(mavlink_channel_t chan, uint8_t ch)
 #elif defined(ARDUINO_ARCH_STM32)      && \
       defined(ARDUINO_BLUEPILL_F103CB) && \
      !defined(USBCON)
-  Serial3.write(ch);
+  Serial1.write(ch);
 #else
   Serial.write(ch);
 #endif
@@ -161,8 +165,8 @@ void read_mavlink()
 #elif defined(ARDUINO_ARCH_STM32)      && \
       defined(ARDUINO_BLUEPILL_F103CB) && \
      !defined(USBCON)
-   while (Serial3.available() > 0) {
-            uint8_t ch = Serial3.read();
+   while (Serial1.available() > 0) {
+            uint8_t ch = Serial1.read();
 #else
    while (Serial.available() > 0) {
             uint8_t ch = Serial.read();
