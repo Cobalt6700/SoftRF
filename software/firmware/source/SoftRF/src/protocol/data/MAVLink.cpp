@@ -32,7 +32,7 @@ static bool MAVLinkAPisArmed = false;
 
 void MAVLink_setup()
 {
-  SoC->swSer_begin(57600);
+  SerialOutput.begin(57600);
 }
 
 void PickMAVLinkFix()
