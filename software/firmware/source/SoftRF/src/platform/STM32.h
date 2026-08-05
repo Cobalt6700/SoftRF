@@ -276,6 +276,9 @@ typedef struct stm32_backup_struct {
 #define UATSerial             Serial1
 #define SerialOutput          Serial1
 
+/* Retro MKII: main USB-Serial is shared with MAVLink, so run it at MAVLink's standard baud */
+#define SERIAL_OUT_BR         57600
+
 #define SOC_ADC_VOLTAGE_DIV   1
 #define VREFINT               1200  // mV, STM32F103x8 datasheet value
 
