@@ -517,7 +517,7 @@ void uav()
   /*
   From MAVLink.cpp:  
     read_mavlink(); -> mavlink.cpp
-    This reads the MAVlink data from Serial3 for STM32. If it reads a MAVlink message, it will show as 
+    This reads the MAVlink data from the main USB-Serial (Serial1/SerialOutput) for STM32. If it reads a MAVlink message, it will show as
     mavlink_active. 
     It is looking for a MAVlink heartbeat message. It will updated using do_mavlink_heartbeat.
     It also looks for system time and sys status messages, and will update the gps time stamp and stats like
